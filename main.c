@@ -27,7 +27,7 @@
 
 #define GRID_SIZE  ROWS*COLUMNS
 
-#define UPDATES_PER_FRAME 100
+#define UPDATES_PER_FRAME 200
 
 #define BG_SHADE 0
 
@@ -38,7 +38,7 @@ typedef struct Rectangle
     char changed;
 } Rectangle;
 
-#define N_AGENTS 5000
+#define N_AGENTS 7500
 #define SPEED 0.05
 
 // Affects the tail
@@ -322,33 +322,65 @@ void Draw()
     SDL_RenderPresent(g_renderer);
 }
 
-int main(void)
+void CircleSpawn()
 {
-    // Initialize random number generator
-    srand(time(NULL));
+    int radius = 150;
+    int i = 0;
+    for (float theta = 0; theta < 2*M_PI; theta += 2*M_PI/(N_AGENTS))
+    {
+        if (i < N_AGENTS)
+        {
+            float randomAngle = 2*M_PI*Rand01();
+            agents[i].xPos = COLUMNS/2 + (rand()%radius)*cos(randomAngle);
+            agents[i].yPos = ROWS/2 + (rand()%radius)*sin(randomAngle);
 
-    // Initialize window
-    SDL_Init(SDL_INIT_VIDEO);
 
-    // Creating window
-    g_window = SDL_CreateWindow("Window",
-                                SDL_WINDOWPOS_CENTERED,
-                                SDL_WINDOWPOS_CENTERED,
-                                CAM_WIDTH,
-                                CAM_HEIGHT,
-                                SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN
-    );
+            float vx = (COLUMNS/2 - agents[i].xPos) / sqrt(pow(COLUMNS/2, 2) + pow(agents[i].xPos, 2));
+            float vy = (ROWS/2 - agents[i].yPos) / sqrt(pow(ROWS/2, 2) + pow(agents[i].yPos, 2));
 
-    // Checking if window is created
-    if (g_window == NULL) {
-        printf("Could not create window: %s\n", SDL_GetError());
-        return -1;
+            agents[i].angle = atan2(vx, vy);
+            agents[i].speed = SPEED;
+
+            for (int j = 0; j < TAIL_LENGTH; j++)
+            {
+                agents[i].xPrev[j] = -1;
+                agents[i].yPrev[j] = -1;
+            }
+
+            i++;
+        }
     }
+}
 
-    // Creating renderer window
-    g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_ACCELERATED);
+void RandomSpawn()
+{
+    int i = 0;
+    for (float theta = 0; theta < 2*M_PI; theta += 2*M_PI/(N_AGENTS))
+    {
+        if (i < N_AGENTS)
+        {
+            // agents[i].xPos = COLUMNS/2;
+            // agents[i].yPos = ROWS/2;
 
-    // Creating grid
+            agents[i].xPos = rand()%COLUMNS;
+            agents[i].yPos = rand()%ROWS;
+
+            agents[i].angle = 2*M_PI*Rand01(); //atan2(vx, vy);
+            agents[i].speed = SPEED;
+
+            for (int j = 0; j < TAIL_LENGTH; j++)
+            {
+                agents[i].xPrev[j] = -1;
+                agents[i].yPrev[j] = -1;
+            }
+
+            i++;
+        }
+    }
+}
+
+void CreateGrid()
+{
     int count = 0;
     for (int y = 0; y < CAM_HEIGHT; y+= RECT_HEIGHT)
     {
@@ -373,38 +405,46 @@ int main(void)
             count ++;
         }
     }
+}
+
+int GameWindow()
+{
+        // Initialize random number generator
+    srand(time(NULL));
+
+    // Initialize window
+    SDL_Init(SDL_INIT_VIDEO);
+
+    // Creating window
+    g_window = SDL_CreateWindow("Window",
+                                SDL_WINDOWPOS_CENTERED,
+                                SDL_WINDOWPOS_CENTERED,
+                                CAM_WIDTH,
+                                CAM_HEIGHT,
+                                SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN
+    );
+
+    // Checking if window is created
+    if (g_window == NULL) {
+        printf("Could not create window: %s\n", SDL_GetError());
+        return -1;
+    }
+
+    // Creating renderer window
+    g_renderer = SDL_CreateRenderer(g_window, -1, SDL_RENDERER_ACCELERATED);
+
+    // Creating grid
+    CreateGrid();
+
+
+    // Initialize agents
+    CircleSpawn();
 
 
     SDL_Event e;            // General Event Structure
     char quit = 0;
 
     //SDL_EnableKeyRepeat(500, 30);
-
-    // Initialize agents
-    int i = 0;
-    for (float theta = 0; theta < 2*M_PI; theta += 2*M_PI/(N_AGENTS))
-    {
-        if (i < N_AGENTS)
-        {
-            // agents[i].xPos = COLUMNS/2;
-            // agents[i].yPos = ROWS/2;
-
-            agents[i].xPos = rand()%COLUMNS;
-            agents[i].yPos = rand()%ROWS;
-
-            agents[i].angle = 2*M_PI*Rand01(); //atan2(vx, vy);
-            agents[i].speed = SPEED;
-
-            for (int j = 0; j < TAIL_LENGTH; j++)
-            {
-                agents[i].xPrev[j] = -1;
-                agents[i].yPrev[j] = -1;
-            }
-
-            i++;
-        }
-    }
-
 
     clock_t time1 = clock();
     clock_t time2 = clock();
@@ -459,4 +499,10 @@ int main(void)
     SDL_Quit();
 
     return 0;
+}
+
+int main(void)
+{
+    int ExitCode = GameWindow();
+    return ExitCode;
 }
