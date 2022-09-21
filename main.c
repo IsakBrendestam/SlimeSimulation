@@ -6,19 +6,16 @@
 #include <math.h>           // For mathematical functions
 
 #include <SDL2/SDL.h>       // SDL2 for graphical window
-#include <sys/queue.h>
-
-#define MAX(x, y) (((x) > (y)) ? (x) : (y))
-#define MIN(x, y) (((x) < (y)) ? (x) : (y))
-
-// #define CAM_WIDTH 640
-// #define CAM_HEIGHT 320
 
 
-#define CAM_WIDTH 1280
-#define CAM_HEIGHT 840
+#define MAX(x, y) ((x > y) ? x : y)
+#define MIN(x, y) ((x < y) ? x : y)
 
+// Window Values
+#define CAM_WIDTH 1280      // Possible Values: 640, 1280
+#define CAM_HEIGHT 840      // Possible Values: 320, 840
 
+// Grid Values
 #define RECT_WIDTH 2
 #define RECT_HEIGHT 2
 
@@ -27,28 +24,27 @@
 
 #define GRID_SIZE  ROWS*COLUMNS
 
-#define UPDATES_PER_FRAME 200
-
 #define BG_SHADE 0
 
-typedef struct Rectangle
+typedef struct Tile
 {
     SDL_Rect rect;
     Uint8 bw;
     char changed;
-} Rectangle;
+} Tile;
 
-#define N_AGENTS 7500
-#define SPEED 0.05
+// Agent Values
+#define N_AGENTS 10000
+#define SPEED 0.05f
 
 // Affects the tail
 #define TAIL_LENGTH 300
 #define DIFFUSE_SPEED 0.015
-#define EVAPORATE_SPEED 0.2
+#define EVAPORATE_SPEED 0.2f
 
 // Affects the following system
 #define SENSOR_SCOPE M_PI/6
-#define TURN_SPEED 0.3
+#define TURN_SPEED 0.3f
 #define SENSOR_OFFSET_DIST 3
 #define SENSOR_SIZE 3
 
@@ -64,10 +60,13 @@ typedef struct Agent
     float speed;
 } Agent;
 
+#define UPDATES_PER_FRAME 200
+
+
 Agent agents[N_AGENTS];
 
-Rectangle grid[GRID_SIZE];
-Rectangle tempGrid[GRID_SIZE];
+Tile grid[GRID_SIZE];
+Tile tempGrid[GRID_SIZE];
 
 SDL_Window *g_window;
 SDL_Renderer *g_renderer;
@@ -85,32 +84,31 @@ float Rand01()
     return (float)(rand()%1000)/1000;
 }
 
-// This function could be inproved
 void ChangeShade(int x, int y, Uint8 bw)
 {
     // Finding apropriate rectangle
-    Rectangle *rec = &tempGrid[y*COLUMNS + x];
-    if (rec->changed == 0)
+    Tile *tile = &tempGrid[y*COLUMNS + x];
+    if (tile->changed == 0)
     {
         //printf("hello\n");
-        rec->bw = bw;
+        tile->bw = bw;
     }
-    rec->changed = 1;
+    tile->changed = 1;
 }
 
 void ChangeShadeBlur(int i, Uint8 bw)
 {
     // Finding apropriate rectangle
-    Rectangle *rec = &tempGrid[i];
-    if (rec->changed == 0)
+    Tile *tile = &tempGrid[i];
+    if (tile->changed == 0)
     {
-        rec->bw = bw;
+        tile->bw = bw;
     }
     else
     {
-        rec->bw = MAX(rec->bw, bw);
+        tile->bw = MAX(tile->bw, bw);
     }
-    rec->changed = 1;
+    tile->changed = 1;
 }
 
 void ResetUpdate()
@@ -121,8 +119,8 @@ void ResetUpdate()
     //Resets rectangles in grid
     for (int i = 0; i < GRID_SIZE; i++)
     {
-        Rectangle *rec = &tempGrid[i];
-        rec -> changed = 0;
+        Tile *tile = &tempGrid[i];
+        tile->changed = 0;
     }
 }
 
@@ -216,15 +214,11 @@ void AgentUpdate(deltaTime)
             newYPos = MIN(ROWS-0.01, MAX(0, newYPos));
 
             // Calculate new direction
-            agents[i].angle = 2 * M_PI * ((float)(rand()%1000)) / 1000;
+            agents[i].angle = 2 * M_PI * Rand01();
         }
 
         // Update previous positions
         UpdateTail(agents[i].xPrev, agents[i].yPrev, agents[i].xPos, agents[i].yPos);
-
-        //ChangeShade((int)agents[i].xPos, (int)agents[i].yPos, 0);
-        agents[i].xPrev[0] = agents[i].xPos;
-        agents[i].yPrev[0] = agents[i].yPos;
 
         agents[i].xPos = newXPos;           // Setting new x postion
         agents[i].yPos = newYPos;           // Setting new y position
@@ -234,7 +228,6 @@ void AgentUpdate(deltaTime)
 
 void Blur(double deltaTime)
 {
-
     // Looping over agents
     for (int i = 0; i < N_AGENTS; i++)
     {
@@ -284,7 +277,6 @@ void Blur(double deltaTime)
 
         float diffusedEvaporatedVal = MAX(0, diffusedVal - EVAPORATE_SPEED*deltaTime);
 
-        //tempGrid[i].bw = diffusedEvaporatedVal;
         ChangeShadeBlur(i, diffusedEvaporatedVal);
     }
 }
@@ -324,7 +316,7 @@ void Draw()
 
 void CircleSpawn()
 {
-    int radius = 150;
+    int radius = 100;
     int i = 0;
     for (float theta = 0; theta < 2*M_PI; theta += 2*M_PI/(N_AGENTS))
     {
@@ -334,11 +326,10 @@ void CircleSpawn()
             agents[i].xPos = COLUMNS/2 + (rand()%radius)*cos(randomAngle);
             agents[i].yPos = ROWS/2 + (rand()%radius)*sin(randomAngle);
 
-
             float vx = (COLUMNS/2 - agents[i].xPos) / sqrt(pow(COLUMNS/2, 2) + pow(agents[i].xPos, 2));
             float vy = (ROWS/2 - agents[i].yPos) / sqrt(pow(ROWS/2, 2) + pow(agents[i].yPos, 2));
 
-            agents[i].angle = atan2(vx, vy);
+            agents[i].angle = atan2(vy, vx);
             agents[i].speed = SPEED;
 
             for (int j = 0; j < TAIL_LENGTH; j++)
@@ -382,25 +373,15 @@ void RandomSpawn()
 void CreateGrid()
 {
     int count = 0;
-    for (int y = 0; y < CAM_HEIGHT; y+= RECT_HEIGHT)
+    for (int y = 0; y < CAM_HEIGHT; y += RECT_HEIGHT)
     {
-        for (int x = 0; x < CAM_WIDTH; x+= RECT_WIDTH)
+        for (int x = 0; x < CAM_WIDTH; x += RECT_WIDTH)
         {
-            Rectangle rect;
+            SDL_Rect rect = {x, y, RECT_WIDTH, RECT_HEIGHT};
+            Tile tile = {rect, BG_SHADE, 0};
 
-            rect.rect.x = x;
-            rect.rect.y = y;
-
-            rect.rect.w = RECT_WIDTH;
-            rect.rect.h = RECT_HEIGHT;
-
-
-            //rect.bw = rand()%256;                 // Noise
-            rect.bw = BG_SHADE;                     // Black tiles
-            rect.changed = 0;
-
-            tempGrid[count] = rect;
-            grid[count] = rect;
+            tempGrid[count] = tile;
+            grid[count] = tile;
 
             count ++;
         }
@@ -409,7 +390,7 @@ void CreateGrid()
 
 int GameWindow()
 {
-        // Initialize random number generator
+    // Initialize random number generator
     srand(time(NULL));
 
     // Initialize window
